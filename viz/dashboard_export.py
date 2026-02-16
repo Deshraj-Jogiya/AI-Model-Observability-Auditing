@@ -38,8 +38,8 @@ def generate_governance_dashboard(db_path, output_image_path):
     
     # Create the figure
     fig = plt.figure(figsize=(20, 12), facecolor='#0F172A')
-    fig.suptitle('Tableau AI Governance & Observability Dashboard\nModel Performance, Feature Drift, and Fairness Audit Panel', 
-                 fontsize=22, color='#F8FAFC', weight='bold', y=0.96)
+    fig.suptitle('AI Model Governance & Observability Dashboard (matplotlib static preview)\nModel Performance, Feature Drift, and Fairness Audit Panel -- see the real interactive Tableau Public dashboard linked in the README',
+                 fontsize=18, color='#F8FAFC', weight='bold', y=0.97)
     
     gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.25)
     
@@ -229,6 +229,6 @@ def generate_governance_dashboard(db_path, output_image_path):
 if __name__ == '__main__':
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     db_file = os.path.join(project_dir, 'data', 'observability.db')
-    out_file = os.path.join(project_dir, 'viz', 'tableau_ai_observability.png')
+    out_file = os.path.join(project_dir, 'viz', 'matplotlib_dashboard_preview.png')
     
     generate_governance_dashboard(db_file, out_file)
