@@ -12,10 +12,14 @@ dashboard.
 
 - **Two drift signals that agree:** a KS test and a decile-binned PSI. PSI stays under 0.05 on stable days and climbs past 0.25 exactly
   where the KS p-value collapses.
-- **Fairness audit:** demographic parity and equal opportunity per subgroup, framed against high-risk AI rules (EU AI Act, US FTC).
+- **Fairness audit:** disparate impact (four-fifths rule) and the equal-opportunity gap (true-positive rate, male minus female) by gender,
+  and demographic parity across age groups, framed against high-risk AI rules (EU AI Act, US FTC). On the simulated model every day
+  passes: disparate impact stays between 0.96 and 1.01 and the true-positive-rate gap under 1 point.
 - **Audit log and reporting:** results land in a SQLite audit log, exported to CSV and published as a Tableau dashboard (a log-scale drift
   trend and a subgroup fairness comparison).
-- **Guardrails:** validation checks raise alerts when input distributions move away from the training baseline.
+- **Guardrails:** each audit writes an `audit_alerts` row when a rule crosses its threshold (KS p < 0.01, PSI > 0.25, disparate impact
+  outside 0.8 to 1.25, true-positive-rate gap over 10 points). On the simulated drift, which starts on day 31, the KS alert first fires on
+  day 40, the same day accuracy has fallen 5 points, without needing any outcome labels; by day 60 accuracy is 33.9 points below baseline.
 
 ## Architecture
 
