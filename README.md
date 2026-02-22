@@ -20,6 +20,8 @@ dashboard.
 - **Guardrails:** each audit writes an `audit_alerts` row when a rule crosses its threshold (KS p < 0.01, PSI > 0.25, disparate impact
   outside 0.8 to 1.25, true-positive-rate gap over 10 points). On the simulated drift, which starts on day 31, the KS alert first fires on
   day 40, the same day accuracy has fallen 5 points, without needing any outcome labels; by day 60 accuracy is 33.9 points below baseline.
+- **Less to review:** with the alert table a reviewer opens only the days that raised an alert, 21 of 60 (**65% fewer days**), and
+  reads 25 alerts instead of 300 daily metric values (92% fewer).
 
 ## Architecture
 

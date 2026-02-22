@@ -70,6 +70,17 @@ def guardrail_alerts(audit_df):
     return pd.DataFrame(rows, columns=['audit_date', 'rule', 'value', 'threshold'])
 
 
+def review_load(audit_df, alerts):
+    """What a reviewer has to look at: every day's metrics, or only the days and rules that raised an alert."""
+    metrics_per_day = len(ALERT_RULES) + 1  # the four guardrail metrics plus accuracy degradation
+    days, alert_days = len(audit_df), alerts['audit_date'].nunique()
+    return {
+        'audit_days': days, 'alert_days': int(alert_days), 'days_saved': round(1 - alert_days / days, 4) if days else 0.0,
+        'metric_values': days * metrics_per_day, 'alert_rows': len(alerts),
+        'values_saved': round(1 - len(alerts) / (days * metrics_per_day), 4) if days else 0.0,
+    }
+
+
 def run_fairness_and_drift_audit(db_path):
     """
     Performs observability and fairness auditing on inference logs.
@@ -176,6 +187,9 @@ def run_fairness_and_drift_audit(db_path):
     cursor.execute("DELETE FROM audit_alerts")
     conn.commit()
     alerts.to_sql('audit_alerts', conn, if_exists='append', index=False)
+    load = review_load(audit_df, alerts)
+    print(f"Review load: {load['alert_days']} of {load['audit_days']} days need a look ({load['days_saved']:.0%} fewer); "
+          f"{load['alert_rows']} alerts instead of {load['metric_values']} metric values")
     for rule, count in alerts['rule'].value_counts().items():
         first = alerts.loc[alerts['rule'] == rule, 'audit_date'].min()
         print(f"Guardrail alert '{rule}': {count} day(s), first on {first}")
