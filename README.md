@@ -22,6 +22,9 @@ dashboard.
   day 40, the same day accuracy has fallen 5 points, without needing any outcome labels; by day 60 accuracy is 33.9 points below baseline.
 - **Less to review:** with the alert table a reviewer opens only the days that raised an alert, 21 of 60 (**65% fewer days**), and
   reads 25 alerts instead of 300 daily metric values (92% fewer).
+- **Acting on the alert:** `analytics/retrain_response.py` retrains the model daily after the first drift alert on the latest week of
+  outcomes that have arrived (7-day label delay). It cuts the accumulated accuracy loss by 32.6% and ends at 83.0% accuracy on the
+  last day, against 66.0% for the untouched model.
 
 ## Architecture
 

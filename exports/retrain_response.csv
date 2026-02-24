@@ -1,0 +1,2 @@
+baseline_accuracy,first_alert_day,loss_without_response,loss_with_retraining,loss_reduction,final_accuracy_without,final_accuracy_with
+0.9988,40,3.5396,2.3856,0.326,0.66,0.83

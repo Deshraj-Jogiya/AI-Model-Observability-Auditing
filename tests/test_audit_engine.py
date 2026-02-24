@@ -53,3 +53,18 @@ def test_review_load_counts_only_alert_days_and_rows():
     load = review_load(audit, alerts)
     assert load['alert_days'] == 2 and load['days_saved'] == 0.5
     assert load['metric_values'] == 20 and load['alert_rows'] == 3 and load['values_saved'] == 0.85
+
+
+def test_retraining_after_the_alert_recovers_a_shifted_boundary():
+    from analytics.retrain_response import accuracy_loss
+    rng = np.random.default_rng(0)
+    rows = []
+    for day in range(30):
+        x1 = rng.normal(0, 1, 200); x2 = rng.normal(0, 1, 200)
+        boundary = 0.0 if day < 10 else 1.0          # the true boundary moves on day 10
+        rows.append(pd.DataFrame({"day": day, "input_feature_1": x1, "input_feature_2": x2,
+                                  "predicted_class": (x1 > 0).astype(int), "actual_label": (x1 > boundary).astype(int)}))
+    df = pd.concat(rows, ignore_index=True)
+    result = accuracy_loss(df, first_alert_day=10, lag=2, window=3)
+    assert result["loss_with_retraining"] < result["loss_without_response"]
+    assert result["final_accuracy_with"] > 0.95
