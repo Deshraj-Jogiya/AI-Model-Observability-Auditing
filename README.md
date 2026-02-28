@@ -13,15 +13,17 @@ dashboard.
 - **Two drift signals that agree:** a KS test and a decile-binned PSI. PSI stays under 0.05 on stable days and climbs past 0.25 exactly
   where the KS p-value collapses.
 - **Fairness audit:** disparate impact (four-fifths rule) and the equal-opportunity gap (true-positive rate, male minus female) by gender,
-  and demographic parity across age groups, framed against high-risk AI rules (EU AI Act, US FTC). On the simulated model every day
-  passes: disparate impact stays between 0.96 and 1.01 and the true-positive-rate gap under 1 point.
+  and demographic parity across age groups, framed against high-risk AI rules (EU AI Act, US FTC). On the simulated model the four-fifths
+  rule passes every day (disparate impact stays between 0.96 and 1.01), so an extra check compares the 7-day male-minus-female approval
+  gap with its baseline and alerts at 3 standard errors: it fires on days 52-55, when women's 7-day approval rate has fallen 2.4 points and
+  men's 0.8.
 - **Audit log and reporting:** results land in a SQLite audit log, exported to CSV and published as a Tableau dashboard (a log-scale drift
   trend and a subgroup fairness comparison).
 - **Guardrails:** each audit writes an `audit_alerts` row when a rule crosses its threshold (KS p < 0.01, PSI > 0.25, disparate impact
-  outside 0.8 to 1.25, true-positive-rate gap over 10 points). On the simulated drift, which starts on day 31, the KS alert first fires on
+  outside 0.8 to 1.25, true-positive-rate gap over 10 points, approval gap more than 3 standard errors wider than baseline). On the simulated drift, which starts on day 31, the KS alert first fires on
   day 40, the same day accuracy has fallen 5 points, without needing any outcome labels; by day 60 accuracy is 33.9 points below baseline.
 - **Less to review:** with the alert table a reviewer opens only the days that raised an alert, 21 of 60 (**65% fewer days**), and
-  reads 25 alerts instead of 300 daily metric values (92% fewer).
+  reads 29 alerts instead of 360 daily metric values (92% fewer).
 - **Acting on the alert:** `analytics/retrain_response.py` retrains the model daily after the first drift alert on the latest week of
   outcomes that have arrived (7-day label delay). It cuts the accumulated accuracy loss by 32.6% and ends at 83.0% accuracy on the
   last day, against 66.0% for the untouched model.

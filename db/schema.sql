@@ -28,6 +28,8 @@ CREATE TABLE fairness_audit_history (
     drift_p_value REAL NOT NULL,      -- Kolmogorov-Smirnov test p-value for feature drift
     psi_score REAL NOT NULL,          -- Population Stability Index for feature drift (decile-binned)
     equal_opportunity_difference REAL NOT NULL, -- True-positive rate, Male minus Female
+    approval_gap_shift REAL NOT NULL, -- 7-day approval-rate gap (Male minus Female) minus the baseline gap, in points
+    approval_gap_z REAL NOT NULL,     -- that shift divided by its standard error
     accuracy_degradation REAL NOT NULL -- Performance decay relative to baseline accuracy
 );
 
@@ -35,7 +37,7 @@ CREATE TABLE fairness_audit_history (
 CREATE TABLE audit_alerts (
     alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_date TEXT NOT NULL,
-    rule TEXT NOT NULL,               -- ks_drift, psi_major_shift, disparate_impact, equal_opportunity
+    rule TEXT NOT NULL,               -- ks_drift, psi_major_shift, disparate_impact, equal_opportunity, approval_gap_shift
     value REAL NOT NULL,
     threshold REAL NOT NULL
 );

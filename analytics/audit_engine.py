@@ -39,13 +39,41 @@ def population_stability_index(baseline, current, bins=10):
     return float(np.sum((current_pct - baseline_pct) * np.log(current_pct / baseline_pct)))
 
 
-# Guardrail thresholds: KS p-value, PSI major shift, the four-fifths rule, and a 10-point true-positive-rate gap
+# Guardrail thresholds: KS p-value, PSI major shift, the four-fifths rule, a 10-point true-positive-rate gap, and the
+# approval-rate gap widening past 3 standard errors from its baseline
+APPROVAL_GAP_Z = 3.0
 ALERT_RULES = {
     "ks_drift": ("drift_p_value", lambda v: v < 0.01, 0.01),
     "psi_major_shift": ("psi_score", lambda v: v > 0.25, 0.25),
     "disparate_impact": ("disparate_impact_ratio", lambda v: v < 0.8 or v > 1.25, 0.8),
     "equal_opportunity": ("equal_opportunity_difference", lambda v: abs(v) > 0.1, 0.1),
+    "approval_gap_shift": ("approval_gap_z", lambda v: v > APPROVAL_GAP_Z, APPROVAL_GAP_Z),
 }
+
+
+def approval_rates(df):
+    """Approval rate and row count for the privileged group (Male) and the unprivileged group (Female)."""
+    male, female = df[df['gender'] == 'Male']['predicted_class'], df[df['gender'] == 'Female']['predicted_class']
+    return male.mean(), len(male), female.mean(), len(female)
+
+
+def approval_gap_shift(baseline_df, window_df):
+    """
+    How far the male-minus-female approval gap in a window has moved from the same gap in the baseline.
+
+    The four-fifths rule compares the two approval rates as a ratio, so when nearly everyone is approved the ratio
+    stays close to 1 even while one group's rate falls several times faster than the other's. Measuring the change
+    in the gap against its own baseline catches that. Returns the shift in percentage points and its z-score (the
+    shift divided by the standard error of the two gaps, both treated as differences of independent proportions);
+    only a widening against the unprivileged group gives a positive z.
+    """
+    bm, bnm, bf, bnf = approval_rates(baseline_df)
+    m, nm, f, nf = approval_rates(window_df)
+    if min(bnm, bnf, nm, nf) == 0:
+        return 0.0, 0.0
+    shift = (m - f) - (bm - bf)
+    se = np.sqrt(m * (1 - m) / nm + f * (1 - f) / nf + bm * (1 - bm) / bnm + bf * (1 - bf) / bnf)
+    return float(shift * 100), float(shift / se) if se > 0 else 0.0
 
 
 def true_positive_rate(df):
@@ -72,7 +100,7 @@ def guardrail_alerts(audit_df):
 
 def review_load(audit_df, alerts):
     """What a reviewer has to look at: every day's metrics, or only the days and rules that raised an alert."""
-    metrics_per_day = len(ALERT_RULES) + 1  # the four guardrail metrics plus accuracy degradation
+    metrics_per_day = len(ALERT_RULES) + 1  # the guardrail metrics plus accuracy degradation
     days, alert_days = len(audit_df), alerts['audit_date'].nunique()
     return {
         'audit_days': days, 'alert_days': int(alert_days), 'days_saved': round(1 - alert_days / days, 4) if days else 0.0,
@@ -117,8 +145,9 @@ def run_fairness_and_drift_audit(db_path):
     print(f"  - Baseline Feature 1 Size: {len(baseline_f1)}")
     
     audit_results = []
-    
-    for date in unique_dates:
+    gap_window = 7  # days pooled for the approval-gap check; one day is too few decisions to separate a shift from noise
+
+    for i, date in enumerate(unique_dates):
         day_df = df[df['audit_date'] == date]
         
         # 1. Feature Drift: Kolmogorov-Smirnov Test on input_feature_1
@@ -156,7 +185,14 @@ def run_fairness_and_drift_audit(db_path):
         else:
             demographic_parity_ratio = 1.0
             
-        # 4. Performance Decay: Accuracy Degradation
+        # 4. Fairness Shift: the approval gap over the last 7 days against the baseline gap
+        if i + 1 >= gap_window:
+            window_df = df[df['audit_date'].isin(unique_dates[i + 1 - gap_window:i + 1])]
+            gap_shift, gap_z = approval_gap_shift(baseline_df, window_df)
+        else:
+            gap_shift, gap_z = 0.0, 0.0
+
+        # 5. Performance Decay: Accuracy Degradation
         day_accuracy = (day_df['predicted_class'] == day_df['actual_label']).mean()
         accuracy_degradation = baseline_accuracy - day_accuracy
         
@@ -167,6 +203,8 @@ def run_fairness_and_drift_audit(db_path):
             'drift_p_value': float(p_value),
             'psi_score': psi_score,
             'equal_opportunity_difference': equal_opportunity_difference(day_df),
+            'approval_gap_shift': gap_shift,
+            'approval_gap_z': gap_z,
             'accuracy_degradation': float(accuracy_degradation)
         })
         

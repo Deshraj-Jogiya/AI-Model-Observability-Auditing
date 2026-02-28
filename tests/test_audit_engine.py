@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from analytics.audit_engine import equal_opportunity_difference, guardrail_alerts, population_stability_index, review_load
+from analytics.audit_engine import (approval_gap_shift, equal_opportunity_difference, guardrail_alerts,
+                                    population_stability_index, review_load)
 
 
 def test_psi_is_near_zero_for_identical_distributions():
@@ -39,12 +40,12 @@ def test_equal_opportunity_difference_is_the_true_positive_rate_gap():
 
 def test_guardrail_alerts_fire_only_past_their_thresholds():
     audit = pd.DataFrame([
-        {'audit_date': '2026-01-01', 'drift_p_value': 0.5, 'psi_score': 0.02, 'disparate_impact_ratio': 0.97, 'equal_opportunity_difference': 0.01},
-        {'audit_date': '2026-01-02', 'drift_p_value': 0.001, 'psi_score': 0.3, 'disparate_impact_ratio': 0.7, 'equal_opportunity_difference': -0.2},
+        {'audit_date': '2026-01-01', 'drift_p_value': 0.5, 'psi_score': 0.02, 'disparate_impact_ratio': 0.97, 'equal_opportunity_difference': 0.01, 'approval_gap_z': 0.4},
+        {'audit_date': '2026-01-02', 'drift_p_value': 0.001, 'psi_score': 0.3, 'disparate_impact_ratio': 0.7, 'equal_opportunity_difference': -0.2, 'approval_gap_z': 3.5},
     ])
     alerts = guardrail_alerts(audit)
     assert set(alerts['audit_date']) == {'2026-01-02'}
-    assert set(alerts['rule']) == {'ks_drift', 'psi_major_shift', 'disparate_impact', 'equal_opportunity'}
+    assert set(alerts['rule']) == {'ks_drift', 'psi_major_shift', 'disparate_impact', 'equal_opportunity', 'approval_gap_shift'}
 
 
 def test_review_load_counts_only_alert_days_and_rows():
@@ -52,7 +53,7 @@ def test_review_load_counts_only_alert_days_and_rows():
     alerts = pd.DataFrame({'audit_date': ['d2', 'd2', 'd4'], 'rule': ['ks_drift', 'psi_major_shift', 'ks_drift']})
     load = review_load(audit, alerts)
     assert load['alert_days'] == 2 and load['days_saved'] == 0.5
-    assert load['metric_values'] == 20 and load['alert_rows'] == 3 and load['values_saved'] == 0.85
+    assert load['metric_values'] == 24 and load['alert_rows'] == 3 and load['values_saved'] == 0.875
 
 
 def test_retraining_after_the_alert_recovers_a_shifted_boundary():
@@ -68,3 +69,26 @@ def test_retraining_after_the_alert_recovers_a_shifted_boundary():
     result = accuracy_loss(df, first_alert_day=10, lag=2, window=3)
     assert result["loss_with_retraining"] < result["loss_without_response"]
     assert result["final_accuracy_with"] > 0.95
+
+
+def _decisions(male_approved, male_total, female_approved, female_total):
+    return pd.DataFrame({
+        'gender': ['Male'] * male_total + ['Female'] * female_total,
+        'predicted_class': [1] * male_approved + [0] * (male_total - male_approved)
+                           + [1] * female_approved + [0] * (female_total - female_approved),
+    })
+
+
+def test_approval_gap_shift_catches_a_widening_the_four_fifths_ratio_misses():
+    baseline = _decisions(1995, 2000, 1994, 2000)   # 99.75% vs 99.70%
+    window = _decisions(1990, 2000, 1940, 2000)     # 99.5% vs 97.0%
+    assert (1940 / 2000) / (1990 / 2000) > 0.8      # the four-fifths rule still passes
+    shift, z = approval_gap_shift(baseline, window)
+    assert abs(shift - 2.45) < 1e-9
+    assert z > 3
+
+
+def test_approval_gap_shift_stays_quiet_on_noise_and_when_the_gap_favours_the_unprivileged_group():
+    baseline = _decisions(1995, 2000, 1994, 2000)
+    assert abs(approval_gap_shift(baseline, _decisions(1996, 2000, 1993, 2000))[1]) < 1
+    assert approval_gap_shift(baseline, _decisions(1940, 2000, 1990, 2000))[1] < 0
