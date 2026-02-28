@@ -10,8 +10,8 @@ dashboard.
 
 ## Highlights
 
-- **Two drift signals that agree:** a KS test and a decile-binned PSI. PSI stays under 0.05 on stable days and climbs past 0.25 exactly
-  where the KS p-value collapses.
+- **Two drift signals:** a KS test and a decile-binned PSI. PSI stays under 0.05 on stable days. On the simulated drift the KS test
+  alerts first, on day 40, and PSI passes 0.25 on day 54, so KS is the early warning and PSI the severity score.
 - **Fairness audit:** disparate impact (four-fifths rule) and the equal-opportunity gap (true-positive rate, male minus female) by gender,
   and demographic parity across age groups, framed against high-risk AI rules (EU AI Act, US FTC). On the simulated model the four-fifths
   rule passes every day (disparate impact stays between 0.96 and 1.01), so an extra check compares the 7-day male-minus-female approval
