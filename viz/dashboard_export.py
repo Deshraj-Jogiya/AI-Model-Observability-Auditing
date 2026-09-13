@@ -53,10 +53,18 @@ def generate_governance_dashboard(db_path, output_image_path):
     ax_drift.axhline(y=0.05, color='#EF4444', linestyle='--', linewidth=1.5, label='Significance Threshold (0.05)')
     
     ax_drift.set_yscale('log')
-    ax_drift.set_title('A. Input Data Drift Trend (KS Test p-value over time)', fontsize=14, pad=12, weight='bold', color='#F8FAFC')
+    ax_drift.set_title('A. Input Data Drift Trend (KS Test p-value & PSI over time)', fontsize=14, pad=12, weight='bold', color='#F8FAFC')
     ax_drift.set_xlabel('Audit Date', fontsize=11)
     ax_drift.set_ylabel('p-value (Log Scale)', fontsize=11)
     ax_drift.grid(True, which="both", ls=":", color='#334155', alpha=0.5)
+
+    # PSI on its own linear axis -- a complementary severity score (0.1/0.25
+    # conventional thresholds) rather than the p-value's binary significant call.
+    ax_psi = ax_drift.twinx()
+    sns.lineplot(data=df_audit, x='audit_date', y='psi_score', color='#FBBF24', linewidth=2, ax=ax_psi, label='PSI')
+    ax_psi.axhline(y=0.25, color='#FBBF24', linestyle=':', linewidth=1, alpha=0.7)
+    ax_psi.set_ylabel('PSI', fontsize=11, color='#FBBF24')
+    ax_psi.tick_params(axis='y', colors='#FBBF24')
     ax_drift.legend(facecolor='#1E293B', edgecolor='#475569', labelcolor='#F8FAFC')
     
     # Format x-axis dates
@@ -186,10 +194,12 @@ def generate_governance_dashboard(db_path, output_image_path):
         "                    ---------------------------\n\n"
         f"  • Run Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"  • Total Logs Audited: {len(df_logs):,} records (60 Days)\n"
-        f"  • Daily Ingestion Vol: 500 inferences/day\n\n"
+        f"  • Daily Ingestion Vol: 500 inferences/day\n"
         f"  • Feature Drift Status: {drift_status}\n"
         f"    - Baseline p-value: {first_audit['drift_p_value']:.4f}\n"
-        f"    - Current p-value: {last_audit['drift_p_value']:.2e}\n\n"
+        f"    - Current p-value: {last_audit['drift_p_value']:.2e}\n"
+        f"    - Current PSI: {last_audit['psi_score']:.3f} "
+        f"({'major shift' if last_audit['psi_score'] > 0.25 else 'moderate shift' if last_audit['psi_score'] > 0.1 else 'no significant shift'})\n\n"
         f"  • Demographic Parity Status: {fairness_status}\n"
         f"    - Disparate Impact Ratio (Current): {last_audit['disparate_impact_ratio']:.3f}\n"
         f"    - Demographic Parity Ratio (Current): {last_audit['demographic_parity_ratio']:.3f}\n\n"

@@ -25,6 +25,7 @@ CREATE TABLE fairness_audit_history (
     disparate_impact_ratio REAL NOT NULL,
     demographic_parity_ratio REAL NOT NULL,
     drift_p_value REAL NOT NULL,      -- Kolmogorov-Smirnov test p-value for feature drift
+    psi_score REAL NOT NULL,          -- Population Stability Index for feature drift (decile-binned)
     accuracy_degradation REAL NOT NULL -- Performance decay relative to baseline accuracy
 );
 

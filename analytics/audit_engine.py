@@ -5,6 +5,40 @@ import pandas as pd
 import numpy as np
 from scipy.stats import ks_2samp
 
+
+def population_stability_index(baseline, current, bins=10):
+    """
+    Standard decile-binned PSI: bin edges come from the baseline distribution's
+    own quantiles, then compare each bucket's share of the baseline vs. current
+    population. PSI = sum((cur% - base%) * ln(cur% / base%)) over buckets.
+
+    Common read: <0.1 no significant shift, 0.1-0.25 moderate shift,
+    >0.25 major shift -- unlike the KS test's p-value, PSI gives a single
+    continuous severity score rather than a binary significant/not-significant
+    call, which is why both are computed here rather than one replacing the
+    other.
+    """
+    baseline = np.asarray(baseline, dtype=float)
+    current = np.asarray(current, dtype=float)
+
+    quantiles = np.linspace(0, 1, bins + 1)
+    edges = np.unique(np.quantile(baseline, quantiles))
+    edges[0] = -np.inf
+    edges[-1] = np.inf
+    if len(edges) < 3:
+        # Baseline has too little spread to bin meaningfully.
+        return 0.0
+
+    baseline_counts, _ = np.histogram(baseline, bins=edges)
+    current_counts, _ = np.histogram(current, bins=edges)
+
+    epsilon = 1e-4
+    baseline_pct = baseline_counts / max(len(baseline), 1) + epsilon
+    current_pct = current_counts / max(len(current), 1) + epsilon
+
+    return float(np.sum((current_pct - baseline_pct) * np.log(current_pct / baseline_pct)))
+
+
 def run_fairness_and_drift_audit(db_path):
     """
     Performs observability and fairness auditing on inference logs.
@@ -48,7 +82,8 @@ def run_fairness_and_drift_audit(db_path):
         # 1. Feature Drift: Kolmogorov-Smirnov Test on input_feature_1
         day_f1 = day_df['input_feature_1'].values
         ks_stat, p_value = ks_2samp(baseline_f1, day_f1)
-        
+        psi_score = population_stability_index(baseline_f1, day_f1)
+
         # 2. Fairness Metric: Disparate Impact (DI) Ratio (Female vs Male)
         # Privileged Group = Male, Unprivileged Group = Female
         male_df = day_df[day_df['gender'] == 'Male']
@@ -88,6 +123,7 @@ def run_fairness_and_drift_audit(db_path):
             'disparate_impact_ratio': float(disparate_impact_ratio),
             'demographic_parity_ratio': float(demographic_parity_ratio),
             'drift_p_value': float(p_value),
+            'psi_score': psi_score,
             'accuracy_degradation': float(accuracy_degradation)
         })
         

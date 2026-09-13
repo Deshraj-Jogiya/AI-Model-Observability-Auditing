@@ -20,3 +20,5 @@ jobs:
           python etl/log_ingestion.py
           python analytics/audit_engine.py
           python viz/dashboard_export.py
+      - name: Run the PSI drift-metric unit tests
+        run: python -m pytest tests/ -v
