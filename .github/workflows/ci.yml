@@ -20,5 +20,17 @@ jobs:
           python etl/log_ingestion.py
           python analytics/audit_engine.py
           python viz/dashboard_export.py
+          python viz/export_tableau_data.py
       - name: Run the PSI drift-metric unit tests
         run: python -m pytest tests/ -v
+      - name: Sanity-check the Tableau CSV exports have real, non-empty data
+        run: |
+          python -c "
+          import pandas as pd
+          logs = pd.read_csv('data/inference_logs.csv')
+          audit = pd.read_csv('data/fairness_audit_history.csv')
+          assert len(logs) == 30000, f'expected 30000 inference logs, got {len(logs)}'
+          assert len(audit) == 60, f'expected 60 audit days, got {len(audit)}'
+          assert set(logs[\"gender\"].unique()) == {\"Male\", \"Female\"}
+          print('Tableau CSV exports look correct.')
+          "

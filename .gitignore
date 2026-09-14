@@ -6,6 +6,14 @@ __pycache__/
 # Databases
 data/observability.db
 
+# Regeneratable CSV exports for Tableau (already embedded inside the packaged .twbx)
+data/inference_logs.csv
+data/fairness_audit_history.csv
+
+# Unpackaged workbook (references external files by path) -- the committed
+# artifact is the packaged .twbx, which bundles the data and is portable
+observability_dashboard.twb
+
 # OS metadata
 .DS_Store
 Thumbs.db
