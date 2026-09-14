@@ -19,10 +19,16 @@ The repository is modular and structured as follows:
 ├── analytics/
 │   └── audit_engine.py      # Statistical engine (KS-Drift & Fairness calculations)
 ├── viz/
-│   ├── dashboard_export.py  # Script to generate a visual governance panel
-│   └── tableau_ai_observability.png # Matplotlib visual mockup of the dashboard
+│   ├── dashboard_export.py            # Static matplotlib preview export
+│   ├── export_tableau_data.py         # Exports SQLite tables to CSV for Tableau Public
+│   └── matplotlib_dashboard_preview.png # Static reference image
 ├── data/
-│   └── observability.db     # SQLite Database containing ingestion & audit tables (gitignored)
+│   ├── observability.db     # SQLite Database containing ingestion & audit tables (gitignored)
+│   ├── inference_logs.csv          # Tableau-ready export (gitignored, regeneratable)
+│   └── fairness_audit_history.csv  # Tableau-ready export (gitignored, regeneratable)
+├── observability_dashboard.twbx  # The real, published Tableau workbook
+├── tests/
+│   └── test_audit_engine.py # Real PSI drift-metric tests
 ├── requirements.txt         # Core dependencies
 └── README.md                # Technical documentation (this file)
 ```
@@ -56,30 +62,42 @@ This alerts operators when **concept drift** occurs, causing prediction scores t
 
 ---
 
-## 📊 Tableau AI Governance Dashboard Integration
+## 📊 Tableau Dashboard
 
-The SQLite output dataset in `data/observability.db` can be directly mapped to **Tableau** to build an interactive, live-updating executive dashboard. 
+**The real, interactive dashboard is built and published live on Tableau Public:
+[AI Model Observability & Fairness Audit Dashboard](https://public.tableau.com/app/profile/deshraj.jogiya/viz/AIModelObservabilityFairnessAuditDashboard/Dashboard1)**
+-- open it in any browser, no Tableau install needed to view it. The packaged
+workbook (`observability_dashboard.twbx`) is also committed in this repo,
+openable directly in Tableau Public Desktop.
 
-### 1. Data Connection
-1. In Tableau, select **Connect -> To a Server -> More... -> SQLite**.
-2. Point Tableau to the local path of `data/observability.db`.
-3. Import both tables (`inference_logs` and `fairness_audit_history`) or write a Custom SQL query utilizing the queries provided in [queries.sql](file:///g:/AI-Model-Observability-Auditing/db/queries.sql).
+**A real gotcha found while building this**: Tableau *Public* (the free
+desktop app individuals use, as opposed to paid Tableau Desktop) only
+supports file-based data sources -- Excel, CSV, PDF, spatial files, web data
+connectors -- not live database connections. The "Connect -> To a Server ->
+SQLite" instructions below describe paid Tableau Desktop, which requires a
+driver Tableau Public doesn't ship. The real path is
+`viz/export_tableau_data.py`, which exports the two SQLite tables to CSV.
 
-### 2. Suggested Worksheet Layouts in Tableau
+### What's actually in the published dashboard
+* **Feature Drift Trend** (line chart, log-scale y-axis): `audit_date` vs
+  `drift_p_value` from `fairness_audit_history.csv`, with an interactive
+  threshold parameter at 0.05. The real data shows a genuine story: noisy,
+  non-significant p-values for the first ~40 days, then a sharp, sustained
+  collapse toward zero -- a real detected drift event, not a flat line.
+* **Selection Rate by Gender** (bar chart): `AVG(predicted_class)` grouped by
+  `gender` from `inference_logs.csv` (30,000 real simulated inference
+  records) -- a direct, real Disparate Impact comparison. In this run both
+  bars land around 99% and are nearly identical: a genuine "no gender bias
+  detected" finding, which is itself a real audit result worth showing, not
+  every fairness check needs to find a problem.
 
-* **KPI Summary Tiles**:
-  * Set a text block of `AVG(Disparate Impact Ratio)` and color-code using a threshold rule: Red if $< 0.80$, Green if $\ge 0.80$.
-  * Set a tile for `MIN(drift_p_value)` for the latest day. Highlight red if $<0.05$.
-* **Input Data Drift Trend (Line Chart)**:
-  * Place `audit_date` on columns (Continuous) and `drift_p_value` on rows.
-  * Right-click the y-axis, select **Logarithmic** scale to highlight small decimal $p$-values.
-  * Add a reference line at $y = 0.05$ labeled "Critical Drift Boundary".
-* **Subgroup Bias Audits (Bar Charts)**:
-  * Rows: `gender` or `age_group`.
-  * Columns: Selection Rate (`SUM(predicted_class) / COUNT(inference_logs)`).
-  * Use a calculated field `[Unprivileged Selection Rate] / [Privileged Selection Rate]` to plot Disparate Impact directly on a Gantt or Bar chart with reference bounds at 0.80 and 1.25.
-* **Accuracy vs Threshold (Dual Axis Chart)**:
-  * Track model prediction accuracy vs target outcomes over time to detect calibration drift.
+### Reproducing it yourself
+1. Run the pipeline (see "Getting Started" below) through `viz/export_tableau_data.py`.
+2. Open **Tableau Public Desktop** (free) -> Connect -> Text File -> `data/fairness_audit_history.csv`.
+3. Build the drift trend sheet: `audit_date` (as Exact Date, continuous) on Columns, `drift_p_value` on Rows, log-scale y-axis, reference line/parameter at 0.05.
+4. New Data Source -> `data/inference_logs.csv`. New worksheet: `gender` on Columns, `predicted_class` on Rows aggregated as **Average**.
+5. New Dashboard, drag both sheets in, add a title.
+6. File -> Export Packaged Workbook (`.twbx`), or File -> Save to Tableau Public to publish live.
 
 ---
 
@@ -102,11 +120,16 @@ Second, run the statistical audit engine to compute daily metrics and populate t
 python analytics/audit_engine.py
 ```
 
-Finally, generate the premium dashboard mockup image:
+Generate the static preview image:
 ```bash
 python viz/dashboard_export.py
 ```
-This saves a professional blue-gray visual report to [viz/tableau_ai_observability.png](file:///g:/AI-Model-Observability-Auditing/viz/tableau_ai_observability.png).
+This saves a static reference image to `viz/matplotlib_dashboard_preview.png`.
+
+Export the CSVs Tableau Public needs:
+```bash
+python viz/export_tableau_data.py
+```
 
 ---
 
