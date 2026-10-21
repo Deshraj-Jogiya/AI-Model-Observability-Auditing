@@ -4,6 +4,7 @@
 -- Drop tables if they exist to ensure clean setup
 DROP TABLE IF EXISTS inference_logs;
 DROP TABLE IF EXISTS fairness_audit_history;
+DROP TABLE IF EXISTS audit_alerts;
 
 -- Table to store individual model inference transactions
 CREATE TABLE inference_logs (
@@ -26,7 +27,17 @@ CREATE TABLE fairness_audit_history (
     demographic_parity_ratio REAL NOT NULL,
     drift_p_value REAL NOT NULL,      -- Kolmogorov-Smirnov test p-value for feature drift
     psi_score REAL NOT NULL,          -- Population Stability Index for feature drift (decile-binned)
+    equal_opportunity_difference REAL NOT NULL, -- True-positive rate, Male minus Female
     accuracy_degradation REAL NOT NULL -- Performance decay relative to baseline accuracy
+);
+
+-- Table to store guardrail alerts raised by each audit (one row per day and rule that fired)
+CREATE TABLE audit_alerts (
+    alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_date TEXT NOT NULL,
+    rule TEXT NOT NULL,               -- ks_drift, psi_major_shift, disparate_impact, equal_opportunity
+    value REAL NOT NULL,
+    threshold REAL NOT NULL
 );
 
 -- Create indexes for performance tuning on common queries

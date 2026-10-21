@@ -39,6 +39,37 @@ def population_stability_index(baseline, current, bins=10):
     return float(np.sum((current_pct - baseline_pct) * np.log(current_pct / baseline_pct)))
 
 
+# Guardrail thresholds: KS p-value, PSI major shift, the four-fifths rule, and a 10-point true-positive-rate gap
+ALERT_RULES = {
+    "ks_drift": ("drift_p_value", lambda v: v < 0.01, 0.01),
+    "psi_major_shift": ("psi_score", lambda v: v > 0.25, 0.25),
+    "disparate_impact": ("disparate_impact_ratio", lambda v: v < 0.8 or v > 1.25, 0.8),
+    "equal_opportunity": ("equal_opportunity_difference", lambda v: abs(v) > 0.1, 0.1),
+}
+
+
+def true_positive_rate(df):
+    """Share of actual positives the model predicted positive; NaN when the group has no actual positives."""
+    positives = df[df['actual_label'] == 1]
+    return (positives['predicted_class'] == 1).mean() if len(positives) > 0 else float('nan')
+
+
+def equal_opportunity_difference(day_df):
+    """True-positive rate of the privileged group (Male) minus the unprivileged group (Female)."""
+    gap = true_positive_rate(day_df[day_df['gender'] == 'Male']) - true_positive_rate(day_df[day_df['gender'] == 'Female'])
+    return 0.0 if np.isnan(gap) else float(gap)
+
+
+def guardrail_alerts(audit_df):
+    """One row per audit day and rule whose value crosses its threshold."""
+    rows = []
+    for _, day in audit_df.iterrows():
+        for rule, (column, fires, threshold) in ALERT_RULES.items():
+            if fires(day[column]):
+                rows.append({'audit_date': day['audit_date'], 'rule': rule, 'value': float(day[column]), 'threshold': threshold})
+    return pd.DataFrame(rows, columns=['audit_date', 'rule', 'value', 'threshold'])
+
+
 def run_fairness_and_drift_audit(db_path):
     """
     Performs observability and fairness auditing on inference logs.
@@ -124,6 +155,7 @@ def run_fairness_and_drift_audit(db_path):
             'demographic_parity_ratio': float(demographic_parity_ratio),
             'drift_p_value': float(p_value),
             'psi_score': psi_score,
+            'equal_opportunity_difference': equal_opportunity_difference(day_df),
             'accuracy_degradation': float(accuracy_degradation)
         })
         
@@ -139,6 +171,14 @@ def run_fairness_and_drift_audit(db_path):
     
     # Save
     audit_df.to_sql('fairness_audit_history', conn, if_exists='append', index=False)
+
+    alerts = guardrail_alerts(audit_df)
+    cursor.execute("DELETE FROM audit_alerts")
+    conn.commit()
+    alerts.to_sql('audit_alerts', conn, if_exists='append', index=False)
+    for rule, count in alerts['rule'].value_counts().items():
+        first = alerts.loc[alerts['rule'] == rule, 'audit_date'].min()
+        print(f"Guardrail alert '{rule}': {count} day(s), first on {first}")
     conn.close()
     
     print(f"Fairness & Drift Audit completed. Logged {len(audit_df)} records.")
