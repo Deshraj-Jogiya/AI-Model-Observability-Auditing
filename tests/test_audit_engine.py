@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from analytics.audit_engine import equal_opportunity_difference, guardrail_alerts, population_stability_index
+from analytics.audit_engine import equal_opportunity_difference, guardrail_alerts, population_stability_index, review_load
 
 
 def test_psi_is_near_zero_for_identical_distributions():
@@ -45,3 +45,11 @@ def test_guardrail_alerts_fire_only_past_their_thresholds():
     alerts = guardrail_alerts(audit)
     assert set(alerts['audit_date']) == {'2026-01-02'}
     assert set(alerts['rule']) == {'ks_drift', 'psi_major_shift', 'disparate_impact', 'equal_opportunity'}
+
+
+def test_review_load_counts_only_alert_days_and_rows():
+    audit = pd.DataFrame({'audit_date': ['d1', 'd2', 'd3', 'd4']})
+    alerts = pd.DataFrame({'audit_date': ['d2', 'd2', 'd4'], 'rule': ['ks_drift', 'psi_major_shift', 'ks_drift']})
+    load = review_load(audit, alerts)
+    assert load['alert_days'] == 2 and load['days_saved'] == 0.5
+    assert load['metric_values'] == 20 and load['alert_rows'] == 3 and load['values_saved'] == 0.85
