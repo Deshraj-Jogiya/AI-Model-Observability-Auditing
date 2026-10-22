@@ -26,6 +26,8 @@ dashboard.
   outcomes that have arrived (7-day label delay). It cuts the accumulated accuracy loss by 32.6% and ends at 83.0% accuracy on the
   last day, against 66.0% for the untouched model.
 
+Measured results, each with the question, the test and the decision: [docs/FINDINGS.md](docs/FINDINGS.md).
+
 ## Architecture
 
 ```mermaid
